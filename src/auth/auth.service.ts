@@ -14,6 +14,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { generateVerificationCode } from 'src/common/utils/generate-verification-code';
 import { User } from 'src/users/schemas/user.schema';
+import { PreferencesService } from 'src/preferences/preferences.service';
 
 /**
  * Authentication service handling user registration, login, and JWT token management
@@ -25,12 +26,13 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private preferenceService: PreferencesService,
   ) {}
 
   /**
    * Validate user credentials for login
-   * @param email - User email
-   * @param password - User password
+   * @param email - User email string
+   * @param password - User password string (plain)
    * @returns User data without password if valid, null otherwise
    */
   async validateUser(email: string, password: string): Promise<User | null> {
@@ -40,11 +42,16 @@ export class AuthService {
         this.logger.warn(`User not found: ${email}`);
         return null;
       }
-
-      const isPasswordMatch = await bcrypt.compare(password, user.password);
+      this.logger.log('param pass: ', password);
+      this.logger.log('user pass: ', user.password);
+      const isPasswordMatch = await bcrypt.compare(
+        String(password),
+        String(user.password),
+      );
+      this.logger.log('isPasswordMatch: ', isPasswordMatch);
       if (!isPasswordMatch) {
         this.logger.warn(`Invalid credentials for email: ${email}`);
-        return null;
+        throw new UnauthorizedException('Invalid credentials');
       }
       this.logger.log(`User ${email} validated successfully`);
       return user;
@@ -89,7 +96,8 @@ export class AuthService {
   }
   /**
    * Generate JWT token and return user data for successful login
-   * @param user - Authenticated user object
+   * @param email - User email string
+   * @param password - User password string (plain)
    * @returns Authentication response with user data and JWT token
    */
   async login(email: string, password: string): Promise<AuthResponseDto> {
@@ -138,8 +146,9 @@ export class AuthService {
         verificationCode: code,
         verificationCodeExpiry: new Date(Date.now() + 10 * 60 * 1000),
       });
+      await this.preferenceService.createDefault(user.id);
       this.logger.log(`User ${user.email} registered successfully`);
-      return this.login(user.email, user.password);
+      return this.login(user.email, userData.password);
     } catch (error) {
       this.logger.error(
         `Error during registration for user ${userData.email}:`,

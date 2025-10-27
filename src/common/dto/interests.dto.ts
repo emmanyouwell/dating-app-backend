@@ -10,3 +10,7 @@ export class CreateInterestDto {
   category?: string;
 }
 
+export class InterestResponseDto {
+  name: string;
+  category?: string;
+}

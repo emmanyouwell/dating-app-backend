@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { UploadModule } from './upload/upload.module';
 import { CloudinaryService } from './upload/cloudinary.service';
 import { InterestsModule } from './interests/interests.module';
+import { PreferencesModule } from './preferences/preferences.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { InterestsModule } from './interests/interests.module';
     AuthModule,
     UploadModule,
     InterestsModule,
+    PreferencesModule,
   ],
   controllers: [AppController],
   providers: [AppService, CloudinaryService],

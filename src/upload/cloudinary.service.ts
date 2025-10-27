@@ -1,7 +1,7 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import { ConfigService } from '@nestjs/config';
-import { UploadApiResponse } from 'cloudinary';
+import { UploadApiResponse, DeleteApiResponse } from 'cloudinary';
 
 @Injectable()
 export class CloudinaryService {
@@ -13,48 +13,33 @@ export class CloudinaryService {
     });
   }
 
+  /**
+   * Upload an image file to Cloudinary
+   * @param filePath - Local path to the image file
+   * @returns The Cloudinary upload response
+   * @throws HttpException if the upload fails
+   */
   async uploadImage(filePath: string): Promise<UploadApiResponse> {
-    try {
-      return await cloudinary.uploader.upload(filePath, {
-        folder: 'dating-app/avatar', // customize your folder name
-        resource_type: 'image',
-      });
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error; // already a valid Nest exception
-      }
+    const result = await cloudinary.uploader.upload(filePath, {
+      folder: 'dating-app/avatar', // customize your folder name
+      resource_type: 'image',
+    });
 
-      if (error instanceof Error) {
-        throw new HttpException(
-          error.message || 'Cloudinary upload failed',
-          HttpStatus.UNAUTHORIZED,
-        );
-      }
-
-      // fallback for truly unknown types
-
-      throw new Error(`Cloudinary upload failed: ${HttpStatus.UNAUTHORIZED}`);
-    }
+    return result;
   }
 
-  async deleteImage(publicId: string): Promise<any> {
-    try {
-      return await cloudinary.uploader.destroy(publicId);
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error; // already a valid Nest exception
-      }
+  /**
+   * Delete an image from Cloudinary by its public ID
+   * @param publicId - The Cloudinary public ID of the image
+   * @returns Cloudinary destroy response
+   * @throws HttpException if deletion fails
+   */
+  async deleteImage(publicId: string): Promise<DeleteApiResponse> {
+    const result: DeleteApiResponse = (await cloudinary.uploader.destroy(
+      publicId,
+      { resource_type: 'image' },
+    )) as DeleteApiResponse;
 
-      if (error instanceof Error) {
-        throw new HttpException(
-          error.message || 'Cloudinary deletion failed',
-          HttpStatus.UNAUTHORIZED,
-        );
-      }
-
-      // fallback for truly unknown types
-
-      throw new Error(`Cloudinary deletion failed: ${HttpStatus.UNAUTHORIZED}`);
-    }
+    return result;
   }
 }

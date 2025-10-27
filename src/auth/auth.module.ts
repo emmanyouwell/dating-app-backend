@@ -8,9 +8,11 @@ import { JwtStrategy } from './jwt.strategy';
 import { LocalStrategy } from './local.strategy';
 import { UsersModule } from '../users/users.module';
 import type { StringValue } from 'ms';
+import { PreferencesModule } from 'src/preferences/preferences.module';
 
 @Module({
   imports: [
+    PreferencesModule,
     UsersModule,
     PassportModule,
     JwtModule.registerAsync({

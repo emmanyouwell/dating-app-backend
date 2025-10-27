@@ -1,11 +1,8 @@
 import {
   Body,
   Controller,
-  HttpException,
-  HttpStatus,
   Param,
   Patch,
-  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -22,14 +19,11 @@ import { UserResponseDto } from 'src/common/dto/auth.dto';
 export class UsersController {
   constructor(private usersService: UsersService) {}
   /**
-   * Updates the user's profile (name, bio, birthday, or avatar).
-   *
-   * @route PATCH /users/:id/profile
-   * @param id - User ID from route parameter.
-   * @param file - Uploaded image file (optional).
-   * @param updateUserProfileDto - Partial update payload.
-   *
-   * @returns Object containing the updated user and success message.
+   * Update a user's profile, optionally with an avatar image
+   * @param userId - ID of the user to update
+   * @param file - Uploaded avatar file
+   * @param updateUserProfileDto - Profile update data
+   * @returns Updated user data
    */
   @UseGuards(JwtAuthGuard)
   @Patch(':id/profile')
@@ -38,36 +32,18 @@ export class UsersController {
     @Param('id') userId: string,
     @UploadedFile() file: Express.Multer.File,
     @Body() updateUserProfileDto: UpdateUserDto,
-    @Res() res: Response,
-  ) {
-    try {
-      const updatedUser = await this.usersService.updateProfile(
-        userId,
-        updateUserProfileDto,
-        file,
-      );
-      const response: ApiResponse<UserResponseDto> = {
-        success: true,
-        message: 'Profile updated successfully',
-        data: updatedUser,
-        timestamp: new Date().toISOString(),
-      };
+  ): Promise<ApiResponse<UserResponseDto>> {
+    const updatedUser = await this.usersService.updateProfile(
+      userId,
+      updateUserProfileDto,
+      file,
+    );
 
-      res.status(HttpStatus.OK).json(response);
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error; // already a valid Nest exception
-      }
-
-      if (error instanceof Error) {
-        throw new HttpException(
-          error.message || 'Profile update failed',
-          HttpStatus.UNAUTHORIZED,
-        );
-      }
-
-      // fallback for truly unknown types
-      throw new HttpException('Profile update failed', HttpStatus.UNAUTHORIZED);
-    }
+    return {
+      success: true,
+      message: 'Profile updated successfully',
+      data: updatedUser,
+      timestamp: new Date().toISOString(),
+    };
   }
 }
