@@ -2,16 +2,16 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-
+import cookieParser from 'cookie-parser';
 /**
  * Bootstrap the NestJS application with proper configuration
  */
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  
+
   try {
     const app = await NestFactory.create(AppModule);
-    
+    app.use(cookieParser());
     // Enable CORS with proper configuration
     app.enableCors({
       origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
@@ -19,21 +19,23 @@ async function bootstrap() {
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
     });
-    
+
     // Global validation pipe with strict validation
-    app.useGlobalPipes(new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      disableErrorMessages: process.env.NODE_ENV === 'production',
-    }));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        disableErrorMessages: process.env.NODE_ENV === 'production',
+      }),
+    );
 
     // Global exception filter for consistent error handling
     app.useGlobalFilters(new HttpExceptionFilter());
-    
+
     const port = process.env.PORT || 3001;
     await app.listen(port);
-    
+
     logger.log(`🚀 Application is running on: http://localhost:${port}`);
     logger.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
   } catch (error) {
@@ -41,4 +43,7 @@ async function bootstrap() {
     process.exit(1);
   }
 }
-bootstrap();
+bootstrap().catch((err) => {
+  console.error('NestJS failed to start', err);
+  process.exit(1);
+});

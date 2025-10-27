@@ -1,33 +1,69 @@
-import { IsString, IsOptional, IsBoolean, IsDate, IsArray } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsEnum,
+  MaxLength,
+  IsArray,
+  IsDate,
+  ValidateNested,
+  MinLength,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
 /**
- * DTO for updating user profile
+ * DTO for user's address information
  */
-export class UpdateUserDto {
+class AddressDto {
   @IsOptional()
-  @IsString({ message: 'Name must be a string' })
-  name?: string;
+  @IsString()
+  @MaxLength(100, { message: 'City name must not exceed 100 characters' })
+  city?: string;
 
   @IsOptional()
-  @IsBoolean({ message: 'isEmailVerified must be a boolean' })
-  isEmailVerified?: boolean;
+  @IsString()
+  @MaxLength(100, { message: 'Barangay name must not exceed 100 characters' })
+  brgy?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200, { message: 'Street name must not exceed 200 characters' })
+  street?: string;
 }
 
 /**
- * DTO for user profile creation
+ * DTO for update user profile
  */
-export class CreateProfileDto {
-  @IsString({ message: 'Bio must be a string' })
-  bio: string;
+export class UpdateUserDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2, { message: 'Name must be at least 2 characters long' })
+  name: string;
 
-  @IsString({ message: 'Location must be a string' })
-  location: string;
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  birthday?: Date;
 
-  @IsArray({ message: 'Interests must be an array' })
-  @IsString({ each: true, message: 'Each interest must be a string' })
-  interests: string[];
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  shortBio?: string;
 
-  @IsArray({ message: 'Photos must be an array' })
-  @IsString({ each: true, message: 'Each photo must be a string' })
-  photos: string[];
+  @IsOptional()
+  @IsEnum(['male', 'female', 'non-binary', 'other'])
+  gender?: 'male' | 'female' | 'non-binary' | 'other';
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  interests?: string[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AddressDto)
+  address?: AddressDto;
+
+  @IsOptional()
+  @IsEnum(['heterosexual', 'homosexual', 'bisexual', 'other'])
+  sexualOrientation?: 'heterosexual' | 'homosexual' | 'bisexual' | 'other';
 }

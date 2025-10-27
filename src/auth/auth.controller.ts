@@ -1,26 +1,18 @@
 import {
   Controller,
   Post,
-  Get,
   Body,
   UseGuards,
-  Req,
   Res,
   HttpStatus,
   HttpException,
 } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './local-auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import {
-  RegisterDto,
-  LoginDto,
-  AuthResponseDto,
-  UserResponseDto,
-} from '../common/dto/auth.dto';
+import { RegisterDto, LoginDto, UserResponseDto } from '../common/dto/auth.dto';
 import { ApiResponse } from '../common/interfaces/api-response.interface';
-import { UsersService } from 'src/users/users.service';
 
 @Controller('auth')
 export class AuthController {
@@ -67,10 +59,19 @@ export class AuthController {
 
       res.status(HttpStatus.CREATED).json(response);
     } catch (error) {
-      throw new HttpException(
-        error.message || 'Registration failed',
-        error.status || HttpStatus.BAD_REQUEST,
-      );
+      if (error instanceof HttpException) {
+        throw error; // already a valid Nest exception
+      }
+
+      if (error instanceof Error) {
+        throw new HttpException(
+          error.message || 'Registration failed',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      // fallback for truly unknown types
+      throw new HttpException('Registration failed', HttpStatus.UNAUTHORIZED);
     }
   }
   /**
@@ -79,6 +80,7 @@ export class AuthController {
    * @param res - Express response object
    * @returns Email verified confirmation message
    */
+
   @Post('verify-email')
   async verifyEmail(
     @Body() body: { email: string; code: string },
@@ -94,10 +96,19 @@ export class AuthController {
 
       res.status(HttpStatus.OK).json(response);
     } catch (error) {
-      throw new HttpException(
-        error.message || 'Verification failed',
-        error.status || HttpStatus.UNAUTHORIZED,
-      );
+      if (error instanceof HttpException) {
+        throw error; // already a valid Nest exception
+      }
+
+      if (error instanceof Error) {
+        throw new HttpException(
+          error.message || 'Verification failed',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      // fallback for truly unknown types
+      throw new HttpException('Verification failed', HttpStatus.UNAUTHORIZED);
     }
   }
   /**
@@ -106,11 +117,9 @@ export class AuthController {
    * @param res - Express response object
    * @returns Code sent confirmation message
    */
+
   @Post('resend-code')
-  async resendCode(
-    @Body() body: {email:string;},
-    @Res() res: Response,
-  ) {
+  async resendCode(@Body() body: { email: string }, @Res() res: Response) {
     try {
       const result = await this.authService.sendNewCode(body.email);
       const response: ApiResponse = {
@@ -121,24 +130,35 @@ export class AuthController {
 
       res.status(HttpStatus.OK).json(response);
     } catch (error) {
-      throw new HttpException(
-        error.message || 'Verification failed',
-        error.status || HttpStatus.UNAUTHORIZED,
-      );
+      if (error instanceof HttpException) {
+        throw error; // already a valid Nest exception
+      }
+
+      if (error instanceof Error) {
+        throw new HttpException(
+          error.message || 'Verification failed',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      // fallback for truly unknown types
+      throw new HttpException('Verification failed', HttpStatus.UNAUTHORIZED);
     }
   }
   /**
    * Login user with email and password
-   * @param req - Express request object with user data from LocalAuthGuard
+   * @param loginDto - Login user input
    * @param res - Express response object
    * @returns User data and sets authentication cookie
    */
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  async login(@Req() req: Request, @Res() res: Response): Promise<void> {
+  async login(@Body() loginDto: LoginDto, @Res() res: Response): Promise<void> {
     try {
-      const user = req.user as any; // Type assertion for authenticated user
-      const result = await this.authService.login(user);
+      const result = await this.authService.login(
+        loginDto.email,
+        loginDto.password,
+      );
 
       // Set HTTP-only cookie for security
       res.cookie('token', result.token, {
@@ -167,10 +187,19 @@ export class AuthController {
 
       res.status(HttpStatus.OK).json(response);
     } catch (error) {
-      throw new HttpException(
-        error.message || 'Login failed',
-        error.status || HttpStatus.UNAUTHORIZED,
-      );
+      if (error instanceof HttpException) {
+        throw error; // already a valid Nest exception
+      }
+
+      if (error instanceof Error) {
+        throw new HttpException(
+          error.message || 'Login failed',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      // fallback for truly unknown types
+      throw new HttpException('Login failed', HttpStatus.UNAUTHORIZED);
     }
   }
 
@@ -181,7 +210,7 @@ export class AuthController {
    */
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  async logout(@Res() res: Response): Promise<void> {
+  logout(@Res() res: Response): void {
     res.clearCookie('token');
 
     const response: ApiResponse = {
@@ -191,35 +220,5 @@ export class AuthController {
     };
 
     res.status(HttpStatus.OK).json(response);
-  }
-
-  /**
-   * Get current user profile
-   * @param req - Express request object with authenticated user
-   * @returns Current user data
-   */
-  @UseGuards(JwtAuthGuard)
-  @Get('me')
-  async getProfile(@Req() req: Request): Promise<ApiResponse<UserResponseDto>> {
-    const user = req.user as any; // Type assertion for authenticated user
-
-    const userResponse: UserResponseDto = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      isEmailVerified: user.isEmailVerified || false,
-      lastLogin: user.lastLogin || new Date(),
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
-
-    const response: ApiResponse<UserResponseDto> = {
-      success: true,
-      message: 'Profile retrieved successfully',
-      data: userResponse,
-      timestamp: new Date().toISOString(),
-    };
-
-    return response;
   }
 }

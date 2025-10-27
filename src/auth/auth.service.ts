@@ -2,7 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   Logger,
-  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
@@ -12,8 +12,8 @@ import {
   UserResponseDto,
 } from '../common/dto/auth.dto';
 import * as bcrypt from 'bcrypt';
-import type { StringValue } from 'ms';
 import { generateVerificationCode } from 'src/common/utils/generate-verification-code';
+import { User } from 'src/users/schemas/user.schema';
 
 /**
  * Authentication service handling user registration, login, and JWT token management
@@ -33,16 +33,21 @@ export class AuthService {
    * @param password - User password
    * @returns User data without password if valid, null otherwise
    */
-  async validateUser(email: string, password: string): Promise<any> {
+  async validateUser(email: string, password: string): Promise<User | null> {
     try {
       const user = await this.usersService.findByEmail(email);
-      if (user && (await bcrypt.compare(password, user.password))) {
-        const { password, ...result } = user;
-        this.logger.log(`User ${email} validated successfully`);
-        return result;
+      if (!user) {
+        this.logger.warn(`User not found: ${email}`);
+        return null;
       }
-      this.logger.warn(`Invalid credentials for email: ${email}`);
-      return null;
+
+      const isPasswordMatch = await bcrypt.compare(password, user.password);
+      if (!isPasswordMatch) {
+        this.logger.warn(`Invalid credentials for email: ${email}`);
+        return null;
+      }
+      this.logger.log(`User ${email} validated successfully`);
+      return user;
     } catch (error) {
       this.logger.error(`Error validating user ${email}:`, error);
       throw error;
@@ -53,13 +58,13 @@ export class AuthService {
    * @param email - User email
    * @returns Confirmation message
    */
-  async sendNewCode(email: string): Promise<any> {
+  async sendNewCode(email: string): Promise<{ message: string }> {
     try {
       const result = await this.usersService.sendNewCode(email);
-      this.logger.log(result);
+      this.logger.log(result.message);
       return result;
     } catch (error) {
-      this.logger.error(`Error in sending new code: ${error}`)
+      this.logger.error(`Error in sending new code: ${error}`);
       throw error;
     }
   }
@@ -69,10 +74,13 @@ export class AuthService {
    * @param code - Verification code
    * @returns Confirmation message
    */
-  async verifyEmail(body:{email: string, code: string}): Promise<any> {
+  async verifyEmail(body: {
+    email: string;
+    code: string;
+  }): Promise<{ message: string }> {
     try {
       const result = await this.usersService.verifyEmail(body);
-      this.logger.log(result);
+      this.logger.log(result.message);
       return result;
     } catch (error) {
       this.logger.log(`Error during verification: ${error}`);
@@ -84,13 +92,14 @@ export class AuthService {
    * @param user - Authenticated user object
    * @returns Authentication response with user data and JWT token
    */
-  async login(user: any): Promise<AuthResponseDto> {
+  async login(email: string, password: string): Promise<AuthResponseDto> {
     try {
+      const user = await this.validateUser(email, password);
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
       const payload = { email: user.email, sub: user.id };
-      // Ensure expiresIn is a string or number, not undefined
-      const expiresInEnv = process.env.JWT_EXPIRES_IN;
-      const expiresIn = (expiresInEnv || '7d') as StringValue;
-      const token = this.jwtService.sign(payload, { expiresIn });
+      const token = this.jwtService.sign(payload);
 
       const userResponse: UserResponseDto = {
         id: user.id,
@@ -109,7 +118,7 @@ export class AuthService {
         token,
       };
     } catch (error) {
-      this.logger.error(`Error during login for user ${user.email}:`, error);
+      this.logger.error(`Error during login:`, error);
       throw error;
     }
   }
@@ -129,10 +138,8 @@ export class AuthService {
         verificationCode: code,
         verificationCodeExpiry: new Date(Date.now() + 10 * 60 * 1000),
       });
-
-      const { password, ...result } = user;
-      this.logger.log(`User ${userData.email} registered successfully`);
-      return this.login(result);
+      this.logger.log(`User ${user.email} registered successfully`);
+      return this.login(user.email, user.password);
     } catch (error) {
       this.logger.error(
         `Error during registration for user ${userData.email}:`,
@@ -140,15 +147,6 @@ export class AuthService {
       );
       throw error;
     }
-  }
-
-  /**
-   * Handle user logout (for HTTP-only cookies, logout is handled by clearing the cookie)
-   * @returns Success message
-   */
-  async logout(): Promise<{ message: string }> {
-    this.logger.log('User logged out');
-    return { message: 'Logged out successfully' };
   }
 
   /**
@@ -179,5 +177,20 @@ export class AuthService {
       this.logger.error(`Error retrieving profile for user ${userId}:`, error);
       throw error;
     }
+  }
+  /**
+   * Validate user by their unique MongoDB ID (used by JwtStrategy).
+   *
+   * @param userId - The MongoDB ObjectId from JWT payload (payload.sub)
+   * @returns The user document without sensitive fields
+   * @throws UnauthorizedException if user no longer exists
+   */
+  async validateUserById(userId: string): Promise<User> {
+    // Lightweight lookup, no population or sensitive data
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found or account deleted');
+    }
+    return user;
   }
 }

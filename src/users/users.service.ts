@@ -4,16 +4,15 @@ import {
   NotFoundException,
   Logger,
   BadRequestException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
 import { UpdateUserDto } from '../common/dto/user.dto';
-import { RegisterDto } from '../common/dto/auth.dto';
 import { EmailService } from './email.service';
 import { CreateUserInput } from 'src/common/types/create-user-input.type';
 import { generateVerificationCode } from 'src/common/utils/generate-verification-code';
+import { CloudinaryService } from 'src/upload/cloudinary.service';
 
 /**
  * Users service handling user CRUD operations and business logic
@@ -26,6 +25,7 @@ export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private emailService: EmailService,
+    private cloudinaryService: CloudinaryService,
   ) {}
 
   /**
@@ -64,7 +64,10 @@ export class UsersService {
    * @param email - User email
    * @param code - Verification code
    */
-  async verifyEmail(body: { email: string; code: string }): Promise<any> {
+  async verifyEmail(body: {
+    email: string;
+    code: string;
+  }): Promise<{ message: string }> {
     try {
       const { email, code } = body;
       const user = await this.userModel.findOne({ email }).exec();
@@ -81,23 +84,24 @@ export class UsersService {
         user.verificationCodeExpiry < new Date()
       )
         throw new BadRequestException('Verification code expired');
-      this.logger.log(`Code verified successfully for User: ${user.email}`)
+      this.logger.log(`Code verified successfully for User: ${user.email}`);
       user.isEmailVerified = true;
       user.verificationCode = null;
       user.verificationCodeExpiry = null;
       await user.save();
-      this.logger.log(`Email verified successfully for User: ${user.email}`)
+      this.logger.log(`Email verified successfully for User: ${user.email}`);
       return { message: 'Email verified successfully' };
     } catch (error) {
-      this.logger.error(`Error verifying code: ${error}`)
+      this.logger.error(`Error verifying code: ${error}`);
       throw error;
     }
   }
   /**
    * Send new code to user
-   *
+   * @param email - User email
+   * @returns Confirmation message
    */
-  async sendNewCode(email: string): Promise<any> {
+  async sendNewCode(email: string): Promise<{ message: string }> {
     try {
       const user = await this.userModel.findOne({ email }).exec();
       if (!user) {
@@ -109,9 +113,9 @@ export class UsersService {
       const code = generateVerificationCode();
       user.verificationCode = code;
       user.verificationCodeExpiry = new Date(Date.now() + 10 * 60 * 1000);
-      user.save();
+      await user.save();
       await this.emailService.sendVerificationEmail(email, code);
-      this.logger.log(`New code sent to ${email} successfully`)
+      this.logger.log(`New code sent to ${email} successfully`);
       return { message: 'Verification code sent successfully' };
     } catch (error) {
       this.logger.error(`Error sending new code: ${error}`);
@@ -125,11 +129,17 @@ export class UsersService {
    */
   async findByEmail(email: string): Promise<User | null> {
     try {
-      const user = await this.userModel.findOne({ email }).exec();
+      const user = await this.userModel.findOne({ email }).lean().exec();
+      if (user) {
+        return {
+          ...user,
+          id: (user._id as Types.ObjectId).toHexString(),
+        } as unknown as User;
+      }
       this.logger.log(
         `User lookup by email: ${email} - ${user ? 'found' : 'not found'}`,
       );
-      return user;
+      return null;
     } catch (error) {
       this.logger.error(`Error finding user by email ${email}:`, error);
       throw error;
@@ -143,7 +153,7 @@ export class UsersService {
    */
   async findById(id: string): Promise<User | null> {
     try {
-      const user = await this.userModel.findById(id).exec();
+      const user = await this.userModel.findById(id);
       this.logger.log(
         `User lookup by ID: ${id} - ${user ? 'found' : 'not found'}`,
       );
@@ -195,5 +205,45 @@ export class UsersService {
       this.logger.error(`Error deleting user ${id}:`, error);
       throw error;
     }
+  }
+  /**
+   * Updates the user's profile information.
+   *
+   * @param userId - The unique identifier of the user to update.
+   * @param updateData - The payload containing updatable user fields.
+   * @param file - Optional avatar image file for upload to Cloudinary.
+   * @returns Updated user document.
+   *
+   * @throws NotFoundException if the user does not exist.
+   */
+  async updateProfile(
+    userId: string,
+    updateData: UpdateUserDto,
+    file?: Express.Multer.File,
+  ): Promise<User> {
+    // Fetch user record from database
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    // If avatar file is provided, upload to Cloudinary
+    if (file) {
+      /**
+       * Uploads image to Cloudinary under `/dating-app/avatar` folder.
+       * Returns both the `public_id` and `secure_url` for easy future deletion.
+       */
+      const uploadResult = await this.cloudinaryService.uploadImage(file.path);
+      user.avatar = {
+        public_id: uploadResult.public_id,
+        url: uploadResult.secure_url,
+      };
+    }
+
+    const result = await this.userModel
+      .findByIdAndUpdate(userId, updateData, { new: true })
+      .lean()
+      .exec();
+    // Persist the updated user document
+
+    return result as unknown as User;
   }
 }

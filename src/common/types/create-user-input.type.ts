@@ -1,6 +1,6 @@
-import { RegisterDto } from "../dto/auth.dto";
+import { RegisterDto } from '../dto/auth.dto';
 
 export type CreateUserInput = RegisterDto & {
   verificationCode: string;
   verificationCodeExpiry: Date;
-}
+};

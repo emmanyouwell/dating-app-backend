@@ -21,32 +21,42 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    let status: number;
-    let message: string | string[];
-    let error: string;
+    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let message: string | string[] = 'Internal server error';
+    let error = 'InternalServerError';
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      
+
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
         error = exception.name;
-      } else {
-        message = (exceptionResponse as any).message || exception.message;
-        error = (exceptionResponse as any).error || exception.name;
+      } else if (
+        typeof exceptionResponse === 'object' &&
+        exceptionResponse !== null
+      ) {
+        // Narrow safely and avoid `any` accesses
+        const responseObj = exceptionResponse as Record<string, unknown>;
+        message =
+          typeof responseObj.message === 'string' ||
+          Array.isArray(responseObj.message)
+            ? responseObj.message
+            : exception.message;
+        error =
+          typeof responseObj.error === 'string'
+            ? responseObj.error
+            : exception.name;
       }
-    } else {
-      // Handle unexpected errors
-      status = HttpStatus.INTERNAL_SERVER_ERROR;
-      message = 'Internal server error';
-      error = 'InternalServerError';
-      
-      // Log unexpected errors for debugging
+    } else if (exception instanceof Error) {
+      // Log unexpected errors with stack trace
       this.logger.error(
-        `Unexpected error: ${exception}`,
-        exception instanceof Error ? exception.stack : undefined,
+        `Unexpected error: ${exception.message}`,
+        exception.stack,
       );
+    } else {
+      // Handle non-Error values thrown
+      this.logger.error(`Unexpected error: ${String(exception)}`);
     }
 
     const errorResponse = {
@@ -58,9 +68,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
       error,
     };
 
-    // Log the error
+    // Log request details safely
     this.logger.error(
-      `${request.method} ${request.url} - ${status} - ${message}`,
+      `${request.method} ${request.url} - ${status} - ${String(
+        Array.isArray(message) ? message.join(', ') : message,
+      )}`,
       exception instanceof Error ? exception.stack : undefined,
     );
 
