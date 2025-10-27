@@ -1,10 +1,26 @@
-import { Controller, Post, Get, Body, UseGuards, Req, Res, HttpStatus, HttpException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  UseGuards,
+  Req,
+  Res,
+  HttpStatus,
+  HttpException,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './local-auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { RegisterDto, LoginDto, AuthResponseDto, UserResponseDto } from '../common/dto/auth.dto';
+import {
+  RegisterDto,
+  LoginDto,
+  AuthResponseDto,
+  UserResponseDto,
+} from '../common/dto/auth.dto';
 import { ApiResponse } from '../common/interfaces/api-response.interface';
+import { UsersService } from 'src/users/users.service';
 
 @Controller('auth')
 export class AuthController {
@@ -17,10 +33,13 @@ export class AuthController {
    * @returns User data and sets authentication cookie
    */
   @Post('register')
-  async register(@Body() userData: RegisterDto, @Res() res: Response): Promise<void> {
+  async register(
+    @Body() userData: RegisterDto,
+    @Res() res: Response,
+  ): Promise<void> {
     try {
       const result = await this.authService.register(userData);
-      
+
       // Set HTTP-only cookie for security
       res.cookie('token', result.token, {
         httpOnly: true,
@@ -54,7 +73,60 @@ export class AuthController {
       );
     }
   }
+  /**
+   * Verify user email with verification code
+   * @param body - Email and verification code
+   * @param res - Express response object
+   * @returns Email verified confirmation message
+   */
+  @Post('verify-email')
+  async verifyEmail(
+    @Body() body: { email: string; code: string },
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.authService.verifyEmail(body);
+      const response: ApiResponse = {
+        success: true,
+        message: result.message,
+        timestamp: new Date().toISOString(),
+      };
 
+      res.status(HttpStatus.OK).json(response);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Verification failed',
+        error.status || HttpStatus.UNAUTHORIZED,
+      );
+    }
+  }
+  /**
+   * Send new code to user
+   * @param body - User email
+   * @param res - Express response object
+   * @returns Code sent confirmation message
+   */
+  @Post('resend-code')
+  async resendCode(
+    @Body() body: {email:string;},
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.authService.sendNewCode(body.email);
+      const response: ApiResponse = {
+        success: true,
+        message: result.message,
+        timestamp: new Date().toISOString(),
+      };
+
+      res.status(HttpStatus.OK).json(response);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Verification failed',
+        error.status || HttpStatus.UNAUTHORIZED,
+      );
+    }
+  }
   /**
    * Login user with email and password
    * @param req - Express request object with user data from LocalAuthGuard
@@ -67,7 +139,7 @@ export class AuthController {
     try {
       const user = req.user as any; // Type assertion for authenticated user
       const result = await this.authService.login(user);
-      
+
       // Set HTTP-only cookie for security
       res.cookie('token', result.token, {
         httpOnly: true,
@@ -111,7 +183,7 @@ export class AuthController {
   @Post('logout')
   async logout(@Res() res: Response): Promise<void> {
     res.clearCookie('token');
-    
+
     const response: ApiResponse = {
       success: true,
       message: 'Logged out successfully',
@@ -130,7 +202,7 @@ export class AuthController {
   @Get('me')
   async getProfile(@Req() req: Request): Promise<ApiResponse<UserResponseDto>> {
     const user = req.user as any; // Type assertion for authenticated user
-    
+
     const userResponse: UserResponseDto = {
       id: user.id,
       email: user.email,

@@ -1,4 +1,12 @@
-import { IsEmail, IsString, MinLength, IsNotEmpty } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsNotEmpty,
+  IsNumber,
+  IsDate,
+  IsOptional,
+} from 'class-validator';
 
 /**
  * DTO for user registration

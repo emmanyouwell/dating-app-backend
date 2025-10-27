@@ -20,6 +20,12 @@ export class User {
   @Prop({ default: Date.now })
   lastLogin: Date;
 
+  @Prop({type: String, default: null})
+  verificationCode: string | null;
+
+  @Prop({type: Date, default: null})
+  verificationCodeExpiry: Date | null;
+
   // Virtual fields
   id: string;
   createdAt: Date;

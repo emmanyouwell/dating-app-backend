@@ -1,18 +1,32 @@
-import { Injectable, ConflictException, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  Logger,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
 import { UpdateUserDto } from '../common/dto/user.dto';
 import { RegisterDto } from '../common/dto/auth.dto';
+import { EmailService } from './email.service';
+import { CreateUserInput } from 'src/common/types/create-user-input.type';
+import { generateVerificationCode } from 'src/common/utils/generate-verification-code';
 
 /**
  * Users service handling user CRUD operations and business logic
  */
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private emailService: EmailService,
+  ) {}
 
   /**
    * Create a new user
@@ -20,16 +34,24 @@ export class UsersService {
    * @returns Created user document
    * @throws ConflictException if user with email already exists
    */
-  async create(userData: RegisterDto): Promise<User> {
+  async create(userData: CreateUserInput): Promise<User> {
     try {
-      const existingUser = await this.userModel.findOne({ email: userData.email });
+      const existingUser = await this.userModel.findOne({
+        email: userData.email,
+      });
       if (existingUser) {
-        this.logger.warn(`Attempted to create user with existing email: ${userData.email}`);
+        this.logger.warn(
+          `Attempted to create user with existing email: ${userData.email}`,
+        );
         throw new ConflictException('User with this email already exists');
       }
 
       const user = new this.userModel(userData);
       const savedUser = await user.save();
+      await this.emailService.sendVerificationEmail(
+        user.email,
+        userData.verificationCode,
+      );
       this.logger.log(`User created successfully: ${userData.email}`);
       return savedUser;
     } catch (error) {
@@ -37,7 +59,65 @@ export class UsersService {
       throw error;
     }
   }
+  /**
+   * Check if code is valid and matches the verification code
+   * @param email - User email
+   * @param code - Verification code
+   */
+  async verifyEmail(body: { email: string; code: string }): Promise<any> {
+    try {
+      const { email, code } = body;
+      const user = await this.userModel.findOne({ email }).exec();
+      if (!user) throw new BadRequestException('User not found');
 
+      if (user.isEmailVerified)
+        throw new ConflictException('User is already verified');
+
+      if (user?.verificationCode !== code)
+        throw new BadRequestException('Invalid verification code');
+
+      if (
+        !user.verificationCodeExpiry ||
+        user.verificationCodeExpiry < new Date()
+      )
+        throw new BadRequestException('Verification code expired');
+      this.logger.log(`Code verified successfully for User: ${user.email}`)
+      user.isEmailVerified = true;
+      user.verificationCode = null;
+      user.verificationCodeExpiry = null;
+      await user.save();
+      this.logger.log(`Email verified successfully for User: ${user.email}`)
+      return { message: 'Email verified successfully' };
+    } catch (error) {
+      this.logger.error(`Error verifying code: ${error}`)
+      throw error;
+    }
+  }
+  /**
+   * Send new code to user
+   *
+   */
+  async sendNewCode(email: string): Promise<any> {
+    try {
+      const user = await this.userModel.findOne({ email }).exec();
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      if (user.isEmailVerified) {
+        throw new ConflictException('User is already verified');
+      }
+      const code = generateVerificationCode();
+      user.verificationCode = code;
+      user.verificationCodeExpiry = new Date(Date.now() + 10 * 60 * 1000);
+      user.save();
+      await this.emailService.sendVerificationEmail(email, code);
+      this.logger.log(`New code sent to ${email} successfully`)
+      return { message: 'Verification code sent successfully' };
+    } catch (error) {
+      this.logger.error(`Error sending new code: ${error}`);
+      throw error;
+    }
+  }
   /**
    * Find user by email address
    * @param email - User email address
@@ -46,7 +126,9 @@ export class UsersService {
   async findByEmail(email: string): Promise<User | null> {
     try {
       const user = await this.userModel.findOne({ email }).exec();
-      this.logger.log(`User lookup by email: ${email} - ${user ? 'found' : 'not found'}`);
+      this.logger.log(
+        `User lookup by email: ${email} - ${user ? 'found' : 'not found'}`,
+      );
       return user;
     } catch (error) {
       this.logger.error(`Error finding user by email ${email}:`, error);
@@ -62,7 +144,9 @@ export class UsersService {
   async findById(id: string): Promise<User | null> {
     try {
       const user = await this.userModel.findById(id).exec();
-      this.logger.log(`User lookup by ID: ${id} - ${user ? 'found' : 'not found'}`);
+      this.logger.log(
+        `User lookup by ID: ${id} - ${user ? 'found' : 'not found'}`,
+      );
       return user;
     } catch (error) {
       this.logger.error(`Error finding user by ID ${id}:`, error);
@@ -79,7 +163,9 @@ export class UsersService {
    */
   async update(id: string, updateData: UpdateUserDto): Promise<User> {
     try {
-      const user = await this.userModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+      const user = await this.userModel
+        .findByIdAndUpdate(id, updateData, { new: true })
+        .exec();
       if (!user) {
         this.logger.warn(`Attempted to update non-existent user: ${id}`);
         throw new NotFoundException('User not found');
@@ -101,7 +187,9 @@ export class UsersService {
     try {
       const result = await this.userModel.findByIdAndDelete(id).exec();
       const deleted = !!result;
-      this.logger.log(`User deletion attempt: ${id} - ${deleted ? 'successful' : 'not found'}`);
+      this.logger.log(
+        `User deletion attempt: ${id} - ${deleted ? 'successful' : 'not found'}`,
+      );
       return deleted;
     } catch (error) {
       this.logger.error(`Error deleting user ${id}:`, error);

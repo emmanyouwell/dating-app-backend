@@ -1,9 +1,19 @@
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  Logger,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
-import { RegisterDto, AuthResponseDto, UserResponseDto } from '../common/dto/auth.dto';
+import {
+  RegisterDto,
+  AuthResponseDto,
+  UserResponseDto,
+} from '../common/dto/auth.dto';
 import * as bcrypt from 'bcrypt';
-import type {StringValue} from 'ms';
+import type { StringValue } from 'ms';
+import { generateVerificationCode } from 'src/common/utils/generate-verification-code';
 
 /**
  * Authentication service handling user registration, login, and JWT token management
@@ -26,7 +36,7 @@ export class AuthService {
   async validateUser(email: string, password: string): Promise<any> {
     try {
       const user = await this.usersService.findByEmail(email);
-      if (user && await bcrypt.compare(password, user.password)) {
+      if (user && (await bcrypt.compare(password, user.password))) {
         const { password, ...result } = user;
         this.logger.log(`User ${email} validated successfully`);
         return result;
@@ -38,7 +48,37 @@ export class AuthService {
       throw error;
     }
   }
-
+  /**
+   * Send new code to user
+   * @param email - User email
+   * @returns Confirmation message
+   */
+  async sendNewCode(email: string): Promise<any> {
+    try {
+      const result = await this.usersService.sendNewCode(email);
+      this.logger.log(result);
+      return result;
+    } catch (error) {
+      this.logger.error(`Error in sending new code: ${error}`)
+      throw error;
+    }
+  }
+  /**
+   * Verify email for authentication
+   * @param email - User email
+   * @param code - Verification code
+   * @returns Confirmation message
+   */
+  async verifyEmail(body:{email: string, code: string}): Promise<any> {
+    try {
+      const result = await this.usersService.verifyEmail(body);
+      this.logger.log(result);
+      return result;
+    } catch (error) {
+      this.logger.log(`Error during verification: ${error}`);
+      throw error;
+    }
+  }
   /**
    * Generate JWT token and return user data for successful login
    * @param user - Authenticated user object
@@ -50,8 +90,8 @@ export class AuthService {
       // Ensure expiresIn is a string or number, not undefined
       const expiresInEnv = process.env.JWT_EXPIRES_IN;
       const expiresIn = (expiresInEnv || '7d') as StringValue;
-      const token = this.jwtService.sign(payload, { expiresIn});
-      
+      const token = this.jwtService.sign(payload, { expiresIn });
+
       const userResponse: UserResponseDto = {
         id: user.id,
         email: user.email,
@@ -63,7 +103,7 @@ export class AuthService {
       };
 
       this.logger.log(`User ${user.email} logged in successfully`);
-      
+
       return {
         user: userResponse,
         token,
@@ -82,17 +122,22 @@ export class AuthService {
   async register(userData: RegisterDto): Promise<AuthResponseDto> {
     try {
       const hashedPassword = await bcrypt.hash(userData.password, 10);
-      
+      const code = generateVerificationCode();
       const user = await this.usersService.create({
         ...userData,
         password: hashedPassword,
+        verificationCode: code,
+        verificationCodeExpiry: new Date(Date.now() + 10 * 60 * 1000),
       });
 
       const { password, ...result } = user;
       this.logger.log(`User ${userData.email} registered successfully`);
       return this.login(result);
     } catch (error) {
-      this.logger.error(`Error during registration for user ${userData.email}:`, error);
+      this.logger.error(
+        `Error during registration for user ${userData.email}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -117,7 +162,7 @@ export class AuthService {
       if (!user) {
         throw new UnauthorizedException('User not found');
       }
-      
+
       const userResponse: UserResponseDto = {
         id: user.id,
         email: user.email,
@@ -127,7 +172,7 @@ export class AuthService {
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       };
-      
+
       this.logger.log(`Profile retrieved for user ${userId}`);
       return userResponse;
     } catch (error) {
