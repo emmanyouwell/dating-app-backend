@@ -8,6 +8,10 @@ import { UploadModule } from './upload/upload.module';
 import { CloudinaryService } from './upload/cloudinary.service';
 import { InterestsModule } from './interests/interests.module';
 import { PreferencesModule } from './preferences/preferences.module';
+import { MatchingModule } from './matching/matching.module';
+import { GeocodeService } from './geocode/geocode.service';
+import { GeocodeModule } from './geocode/geocode.module';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -21,8 +25,11 @@ import { PreferencesModule } from './preferences/preferences.module';
     UploadModule,
     InterestsModule,
     PreferencesModule,
+    MatchingModule,
+    GeocodeModule,
+    HttpModule,
   ],
   controllers: [AppController],
-  providers: [AppService, CloudinaryService],
+  providers: [AppService, CloudinaryService, GeocodeService],
 })
 export class AppModule {}
