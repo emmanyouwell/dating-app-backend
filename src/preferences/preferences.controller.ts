@@ -4,7 +4,6 @@ import {
   Patch,
   Body,
   UseGuards,
-  Req,
   Logger,
 } from '@nestjs/common';
 import { PreferencesService } from './preferences.service';
@@ -13,9 +12,9 @@ import {
   PreferenceResponseDto,
   UpdatePreferenceDto,
 } from 'src/common/dto/preferences.dto';
-import type { Request } from 'express';
 import { ApiResponse } from 'src/common/interfaces/api-response.interface';
-import { AuthenticatedUser } from 'src/common/interfaces/authenticated-user.interface';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { User } from 'src/users/schemas/user.schema';
 
 @Controller('preferences')
 export class PreferencesController {
@@ -31,11 +30,9 @@ export class PreferencesController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getMyPreferences(
-    @Req() req: Request & { user: AuthenticatedUser },
+    @CurrentUser() user: User,
   ): Promise<ApiResponse<PreferenceResponseDto>> {
-    const preference = await this.preferencesService.findByUser(
-      req.user._id.toHexString(),
-    );
+    const preference = await this.preferencesService.findByUser(user.id);
     return {
       success: true,
       message: 'Preference fetched successfully',
@@ -53,12 +50,11 @@ export class PreferencesController {
   @UseGuards(JwtAuthGuard)
   @Patch('me')
   async updateMyPreferences(
-    @Req() req: Request & { user: AuthenticatedUser },
+    @CurrentUser() user: User,
     @Body() dto: UpdatePreferenceDto,
   ): Promise<ApiResponse<PreferenceResponseDto>> {
-    this.logger.log('req: ', req.user);
     const updatedPreference = await this.preferencesService.update(
-      req.user._id.toHexString(),
+      user.id,
       dto,
     );
 

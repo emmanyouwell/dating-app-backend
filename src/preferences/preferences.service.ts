@@ -23,7 +23,6 @@ export class PreferencesService {
   async findByUser(userId: string): Promise<Preference> {
     const pref = await this.preferenceModel
       .findOne({ userId: new Types.ObjectId(userId) })
-      .populate('preferredInterests')
       .lean()
       .exec();
     if (!pref) throw new NotFoundException('Preferences not found');
@@ -56,7 +55,6 @@ export class PreferencesService {
         { $set: dto },
         { new: true },
       )
-      .populate('preferredInterests')
       .lean()
       .exec();
 
