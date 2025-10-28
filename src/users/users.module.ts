@@ -7,11 +7,13 @@ import { UsersController } from './users.controller';
 import { CloudinaryService } from 'src/upload/cloudinary.service';
 import { GeocodeModule } from 'src/geocode/geocode.module';
 import { PreferencesModule } from 'src/preferences/preferences.module';
+import { SwipeModule } from 'src/swipe/swipe.module';
 
 @Module({
   imports: [
     GeocodeModule,
     PreferencesModule,
+    SwipeModule,
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
   ],
   providers: [UsersService, EmailService, CloudinaryService],

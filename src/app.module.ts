@@ -12,6 +12,8 @@ import { MatchingModule } from './matching/matching.module';
 import { GeocodeService } from './geocode/geocode.service';
 import { GeocodeModule } from './geocode/geocode.module';
 import { HttpModule } from '@nestjs/axios';
+import { SwipeModule } from './swipe/swipe.module';
+import { SwipeService } from './swipe/swipe.service';
 
 @Module({
   imports: [
@@ -28,6 +30,7 @@ import { HttpModule } from '@nestjs/axios';
     MatchingModule,
     GeocodeModule,
     HttpModule,
+    SwipeModule,
   ],
   controllers: [AppController],
   providers: [AppService, CloudinaryService, GeocodeService],

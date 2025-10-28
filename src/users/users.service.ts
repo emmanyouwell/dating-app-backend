@@ -14,6 +14,7 @@ import { CreateUserInput } from 'src/common/types/create-user-input.type';
 import { generateVerificationCode } from 'src/common/utils/generate-verification-code';
 import { CloudinaryService } from 'src/upload/cloudinary.service';
 import { PreferencesService } from 'src/preferences/preferences.service';
+import { SwipeService } from 'src/swipe/swipe.service';
 
 /**
  * Users service handling user CRUD operations and business logic
@@ -27,6 +28,7 @@ export class UsersService {
     private emailService: EmailService,
     private cloudinaryService: CloudinaryService,
     private preferenceService: PreferencesService,
+    private swipeService: SwipeService,
   ) {}
 
   /**
@@ -244,9 +246,14 @@ export class UsersService {
     if (!preferences) {
       throw new BadRequestException('Invalid User Id');
     }
+
+    // Look for swiped candidates (left or right)
+    const swipedCandidates =
+      await this.swipeService.getSwipedCandidateIds(currentUserId);
+
     const candidates = await this.userModel
       .find({
-        _id: { $ne: currentUserId }, // exclude current user
+        _id: { $nin: [...swipedCandidates, currentUserId] }, // exclude current user and swiped candidates
         gender: { $in: preferences.genderPreference },
         birthday: {
           $gte: new Date(
