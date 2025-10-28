@@ -4,9 +4,9 @@ import { HttpModule } from '@nestjs/axios';
 import { GeocodeController } from './geocode.controller';
 
 @Module({
-    imports: [HttpModule],
-    providers: [GeocodeService],
-    exports: [GeocodeService],
-    controllers: [GeocodeController]
+  imports: [HttpModule],
+  providers: [GeocodeService],
+  exports: [GeocodeService],
+  controllers: [GeocodeController],
 })
 export class GeocodeModule {}
