@@ -1,10 +1,12 @@
 import { IsArray, IsIn, IsInt, IsOptional, Min } from 'class-validator';
-import { Types } from 'mongoose';
 
+/**
+ * DTO for preference update input
+ */
 export class UpdatePreferenceDto {
   @IsOptional()
   @IsArray()
-  @IsIn(['Male', 'Female', 'Other'], { each: true })
+  @IsIn(['male', 'female', 'other'], { each: true })
   genderPreference?: string[];
 
   @IsOptional()
@@ -20,16 +22,14 @@ export class UpdatePreferenceDto {
   @IsInt()
   @Min(1)
   maxDistance?: number; // in kilometers
-
-  @IsOptional()
-  @IsArray()
-  preferredInterests?: Types.ObjectId[];
 }
 
+/**
+ * DTO for preference response
+ */
 export class PreferenceResponseDto {
   genderPreference?: string[];
   minAge?: number;
   maxAge?: number;
   maxDistance?: number; // in kilometers
-  interests?: Types.ObjectId[];
 }

@@ -7,21 +7,34 @@ import {
   IsDate,
   ValidateNested,
   MinLength,
-  IsIn,
   ArrayMinSize,
   ArrayMaxSize,
   IsNumber,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import { Types } from 'mongoose';
 
+/**
+ * DTO for address location
+ */
+class LocationDto {
+  @IsEnum(['Point'])
+  readonly type = 'Point' as const;
+
+  @IsArray()
+  @ArrayMinSize(2)
+  @ArrayMaxSize(2)
+  @IsNumber({}, { each: true })
+  coordinates: number[]; // [longitude, latitude]
+}
 /**
  * DTO for user's address information
  */
 export class AddressDto {
   @IsOptional()
   @IsString()
-  @MaxLength(100, { message: 'City name must not exceed 100 characters' })
-  city?: string;
+  @MaxLength(200, { message: 'Street name must not exceed 200 characters' })
+  street?: string;
 
   @IsOptional()
   @IsString()
@@ -30,15 +43,12 @@ export class AddressDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(200, { message: 'Street name must not exceed 200 characters' })
-  street?: string;
+  @MaxLength(100, { message: 'City name must not exceed 100 characters' })
+  city?: string;
 
   @IsOptional()
-  @IsArray()
-  @ArrayMinSize(2)
-  @ArrayMaxSize(2)
-  @IsNumber({}, { each: true })
-  coordinates: [number, number]; // [longitude, latitude]
+  @Type(() => LocationDto)
+  location?: LocationDto;
 }
 
 /**
@@ -66,8 +76,10 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  interests?: string[];
+  @Transform(({ value }: { value: string[] }) =>
+    value.map((v: string) => new Types.ObjectId(v)),
+  )
+  interests?: Types.ObjectId[];
 
   @IsOptional()
   @ValidateNested()
@@ -79,6 +91,9 @@ export class UpdateUserDto {
   sexualOrientation?: 'heterosexual' | 'homosexual' | 'bisexual' | 'other';
 }
 
+/**
+ * DTO for limited user profile response
+ */
 export class LimitedUserProfileDto {
   _id: string;
   name: string;
