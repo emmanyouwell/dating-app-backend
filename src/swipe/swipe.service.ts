@@ -2,11 +2,13 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Swipe, SwipeDocument } from './schema/swipe.schema';
+import { ChatGateway } from 'src/chat/chat.gateway';
 
 @Injectable()
 export class SwipeService {
   constructor(
     @InjectModel(Swipe.name) private swipeModel: Model<SwipeDocument>,
+    private chatGateway: ChatGateway,
   ) {}
 
   /**
@@ -39,7 +41,7 @@ export class SwipeService {
       swipe.isMutualMatch = true;
       reciprocal.isMutualMatch = true;
       await reciprocal.save();
-      // Optional: trigger notification to both users
+      await this.chatGateway.notifyChatUnlocked(userId, candidateId);
     }
 
     return swipe.save();

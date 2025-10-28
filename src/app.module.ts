@@ -13,7 +13,8 @@ import { GeocodeService } from './geocode/geocode.service';
 import { GeocodeModule } from './geocode/geocode.module';
 import { HttpModule } from '@nestjs/axios';
 import { SwipeModule } from './swipe/swipe.module';
-import { SwipeService } from './swipe/swipe.service';
+import { ChatModule } from './chat/chat.module';
+import { MessageModule } from './message/message.module';
 
 @Module({
   imports: [
@@ -31,6 +32,8 @@ import { SwipeService } from './swipe/swipe.service';
     GeocodeModule,
     HttpModule,
     SwipeModule,
+    ChatModule,
+    MessageModule,
   ],
   controllers: [AppController],
   providers: [AppService, CloudinaryService, GeocodeService],
