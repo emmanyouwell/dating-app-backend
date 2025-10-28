@@ -8,18 +8,16 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
-import { AddressDto, UpdateUserDto } from '../common/dto/user.dto';
+import { UpdateUserDto } from '../common/dto/user.dto';
 import { EmailService } from './email.service';
 import { CreateUserInput } from 'src/common/types/create-user-input.type';
 import { generateVerificationCode } from 'src/common/utils/generate-verification-code';
 import { CloudinaryService } from 'src/upload/cloudinary.service';
-import { GeocodeService } from 'src/geocode/geocode.service';
-import { hasAddressChanged } from 'src/common/utils/address.utils';
+import { PreferencesService } from 'src/preferences/preferences.service';
 
 /**
  * Users service handling user CRUD operations and business logic
  */
-
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -28,7 +26,7 @@ export class UsersService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private emailService: EmailService,
     private cloudinaryService: CloudinaryService,
-    private geocodeService: GeocodeService,
+    private preferenceService: PreferencesService,
   ) {}
 
   /**
@@ -62,6 +60,7 @@ export class UsersService {
       throw error;
     }
   }
+
   /**
    * Check if code is valid and matches the verification code
    * @param email - User email
@@ -99,6 +98,7 @@ export class UsersService {
       throw error;
     }
   }
+
   /**
    * Send new code to user
    * @param email - User email
@@ -125,6 +125,7 @@ export class UsersService {
       throw error;
     }
   }
+
   /**
    * Find user by email address
    * @param email - User email address
@@ -156,37 +157,13 @@ export class UsersService {
    */
   async findById(id: string): Promise<User | null> {
     try {
-      const user = await this.userModel.findById(id);
+      const user = await this.userModel.findById(id).populate('interests');
       this.logger.log(
         `User lookup by ID: ${id} - ${user ? 'found' : 'not found'}`,
       );
       return user;
     } catch (error) {
       this.logger.error(`Error finding user by ID ${id}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Update user data
-   * @param id - User ID
-   * @param updateData - Data to update
-   * @returns Updated user document or null if not found
-   * @throws NotFoundException if user not found
-   */
-  async update(id: string, updateData: UpdateUserDto): Promise<User> {
-    try {
-      const user = await this.userModel
-        .findByIdAndUpdate(id, updateData, { new: true })
-        .exec();
-      if (!user) {
-        this.logger.warn(`Attempted to update non-existent user: ${id}`);
-        throw new NotFoundException('User not found');
-      }
-      this.logger.log(`User updated successfully: ${id}`);
-      return user;
-    } catch (error) {
-      this.logger.error(`Error updating user ${id}:`, error);
       throw error;
     }
   }
@@ -240,13 +217,65 @@ export class UsersService {
         url: uploadResult.secure_url,
       };
     }
-
+    this.logger.log(updateData.interests);
     const result = await this.userModel
-      .findByIdAndUpdate(userId, updateData, { new: true })
-      .lean()
+      .findByIdAndUpdate(
+        userId,
+        { $set: updateData },
+        { new: true, runValidators: true },
+      )
+      .populate('interests')
       .exec();
-    // Persist the updated user document
 
     return result as unknown as User;
+  }
+
+  /**
+   * Find potential matches for the user
+   * @param currentUserId string | Current user logged in
+   * @returns Promise<User[] | null> | Potential candidates filtered to match the user
+   */
+  async findCandidates(currentUserId: string): Promise<User[] | null> {
+    const currentUser = await this.userModel.findById(currentUserId).lean();
+    const preferences = await this.preferenceService.findByUser(currentUserId);
+    if (!currentUser) {
+      throw new NotFoundException('User not found');
+    }
+    if (!preferences) {
+      throw new BadRequestException('Invalid User Id');
+    }
+    const candidates = await this.userModel
+      .find({
+        _id: { $ne: currentUserId }, // exclude current user
+        gender: { $in: preferences.genderPreference },
+        birthday: {
+          $gte: new Date(
+            new Date().setFullYear(
+              new Date().getFullYear() - preferences.maxAge,
+            ),
+          ),
+          $lte: new Date(
+            new Date().setFullYear(
+              new Date().getFullYear() - preferences.minAge,
+            ),
+          ),
+        },
+        'address.location': {
+          $near: {
+            $geometry: {
+              type: 'Point',
+              coordinates: currentUser?.address?.location?.coordinates,
+            },
+            $maxDistance: preferences.maxDistance * 1000, // convert km to meters
+          },
+        },
+      })
+      .populate('interests')
+      .limit(100);
+
+    if (!candidates) {
+      throw new NotFoundException('No other candidates');
+    }
+    return candidates;
   }
 }

@@ -1,38 +1,50 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
-import mongoose from 'mongoose';
+import { CallbackError, Document, Model, Query, Types } from 'mongoose';
 import { Interest } from 'src/interests/schema/interests.schema';
-
+import { PreferenceDocument } from 'src/preferences/schema/preferences.schema';
+/**
+ * User Document
+ */
 export type UserDocument = User & Document;
 /**
- * Schema representing the user's address details.
+ * Location schema
+ */
+@Schema({ _id: false })
+class Location {
+  @Prop({
+    type: String,
+    enum: ['Point'],
+    default: 'Point',
+    required: true,
+  })
+  type: 'Point';
+
+  @Prop({
+    type: [Number], // [longitude, latitude]
+    required: true,
+  })
+  coordinates: number[];
+}
+/**
+ * Address schema
  */
 @Schema({ _id: false })
 class Address {
-  @Prop({ type: String, maxlength: 100 })
-  city?: string;
+  @Prop({ type: String, maxlength: 200 })
+  street?: string;
 
   @Prop({ type: String, maxlength: 100 })
   brgy?: string;
 
-  @Prop({ type: String, maxlength: 200 })
-  street?: string;
+  @Prop({ type: String, maxlength: 100 })
+  city?: string;
 
-  @Prop({
-    type: {
-      type: String,
-      enum: ['Point'],
-      default: 'Point',
-    },
-  })
-  locationType: string;
-
-  @Prop({
-    type: [Number], // [longitude, latitude]
-    index: '2dsphere',
-  })
-  coordinates?: number[];
+  @Prop({ type: Location, index: '2dsphere', required: false })
+  location?: Location;
 }
+/**
+ * User schema
+ */
 @Schema({ timestamps: true })
 export class User {
   @Prop({ required: true, unique: true })
@@ -76,14 +88,8 @@ export class User {
   })
   gender?: string;
 
-  @Prop({
-    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Interest' }],
-    default: [],
-  })
-  interests?: Interest[];
-
-  // @Prop({ type: [String], default: [] })
-  // preferences?: string[];
+  @Prop({ type: [Types.ObjectId], ref: 'Interest' })
+  interests?: (Types.ObjectId | Interest)[];
 
   @Prop({ type: Address, default: null })
   address?: Address;
@@ -139,4 +145,26 @@ UserSchema.set('toJSON', {
     const { ...result } = ret; // remove password
     return result;
   },
+});
+/**
+ * Cascade delete the user's preferences when a user is deleted
+ */
+UserSchema.pre('findOneAndDelete', async function (next) {
+  try {
+    // `this` is a Query<UserDocument, UserDocument>
+    const query = this as Query<UserDocument | null, UserDocument>;
+
+    const user = await query.findOne(query.getQuery()).exec();
+
+    if (user) {
+      // Use the global Preference model
+      const PreferencesModel: Model<PreferenceDocument> =
+        user.model('Preference');
+      await PreferencesModel.deleteOne({ userId: user._id }).exec();
+    }
+
+    next();
+  } catch (error: unknown) {
+    next(error as CallbackError);
+  }
 });

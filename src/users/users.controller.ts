@@ -1,6 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
+  Get,
+  NotFoundException,
   Param,
   Patch,
   UploadedFile,
@@ -11,9 +14,10 @@ import { UsersService } from './users.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UpdateUserDto } from 'src/common/dto/user.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
-import type { Response } from 'express';
 import { ApiResponse } from 'src/common/interfaces/api-response.interface';
 import { UserResponseDto } from 'src/common/dto/auth.dto';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { User } from './schemas/user.schema';
 
 @Controller('users')
 export class UsersController {
@@ -26,15 +30,15 @@ export class UsersController {
    * @returns Updated user data
    */
   @UseGuards(JwtAuthGuard)
-  @Patch(':id/profile')
+  @Patch('/me')
   @UseInterceptors(FileInterceptor('avatar'))
   async updateProfile(
-    @Param('id') userId: string,
+    @CurrentUser() user: User,
     @UploadedFile() file: Express.Multer.File,
     @Body() updateUserProfileDto: UpdateUserDto,
   ): Promise<ApiResponse<UserResponseDto>> {
     const updatedUser = await this.usersService.updateProfile(
-      userId,
+      user.id,
       updateUserProfileDto,
       file,
     );
@@ -43,6 +47,42 @@ export class UsersController {
       success: true,
       message: 'Profile updated successfully',
       data: updatedUser,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Get user profile
+   * @param user User | Current user logged in
+   * @returns Promise<ApiResponse<User>> | User details
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('/me')
+  async getProfile(@CurrentUser() user: User): Promise<ApiResponse<User>> {
+    const details = await this.usersService.findById(user.id);
+    if (!details) {
+      throw new NotFoundException('User details not found');
+    }
+    return {
+      success: true,
+      message: 'User details fetched successfully',
+      data: details,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Delete a user
+   * @param id string | User id
+   * @returns Promise<ApiResponse>
+   */
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  async deleteUser(@Param() id: string): Promise<ApiResponse> {
+    await this.usersService.delete(id);
+    return {
+      success: true,
+      message: 'User deleted successfully',
       timestamp: new Date().toISOString(),
     };
   }
