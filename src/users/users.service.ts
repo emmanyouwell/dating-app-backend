@@ -8,11 +8,13 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
-import { UpdateUserDto } from '../common/dto/user.dto';
+import { AddressDto, UpdateUserDto } from '../common/dto/user.dto';
 import { EmailService } from './email.service';
 import { CreateUserInput } from 'src/common/types/create-user-input.type';
 import { generateVerificationCode } from 'src/common/utils/generate-verification-code';
 import { CloudinaryService } from 'src/upload/cloudinary.service';
+import { GeocodeService } from 'src/geocode/geocode.service';
+import { hasAddressChanged } from 'src/common/utils/address.utils';
 
 /**
  * Users service handling user CRUD operations and business logic
@@ -26,6 +28,7 @@ export class UsersService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private emailService: EmailService,
     private cloudinaryService: CloudinaryService,
+    private geocodeService: GeocodeService,
   ) {}
 
   /**

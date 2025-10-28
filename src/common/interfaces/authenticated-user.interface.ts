@@ -14,7 +14,7 @@ export interface AuthenticatedUser {
   avatar: { public_id: string | null; url: string | null };
   gender: string;
   interests: Interest[];
-  preferences: Preference[]; // type if you have Preference type
+  // preferences: Preference[]; 
   address: string | null;
   sexualOrientation: string;
   popularityScore: number;

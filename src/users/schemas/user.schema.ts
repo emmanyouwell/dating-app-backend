@@ -17,6 +17,21 @@ class Address {
 
   @Prop({ type: String, maxlength: 200 })
   street?: string;
+
+  @Prop({
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point',
+    },
+  })
+  locationType: string;
+
+  @Prop({
+    type: [Number], // [longitude, latitude]
+    index: '2dsphere',
+  })
+  coordinates?: number[];
 }
 @Schema({ timestamps: true })
 export class User {
@@ -67,8 +82,8 @@ export class User {
   })
   interests?: Interest[];
 
-  @Prop({ type: [String], default: [] })
-  preferences?: string[];
+  // @Prop({ type: [String], default: [] })
+  // preferences?: string[];
 
   @Prop({ type: Address, default: null })
   address?: Address;

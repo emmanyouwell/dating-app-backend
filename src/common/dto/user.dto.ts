@@ -7,13 +7,17 @@ import {
   IsDate,
   ValidateNested,
   MinLength,
+  IsIn,
+  ArrayMinSize,
+  ArrayMaxSize,
+  IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
  * DTO for user's address information
  */
-class AddressDto {
+export class AddressDto {
   @IsOptional()
   @IsString()
   @MaxLength(100, { message: 'City name must not exceed 100 characters' })
@@ -28,6 +32,13 @@ class AddressDto {
   @IsString()
   @MaxLength(200, { message: 'Street name must not exceed 200 characters' })
   street?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(2)
+  @ArrayMaxSize(2)
+  @IsNumber({}, { each: true })
+  coordinates: [number, number]; // [longitude, latitude]
 }
 
 /**
@@ -66,4 +77,15 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEnum(['heterosexual', 'homosexual', 'bisexual', 'other'])
   sexualOrientation?: 'heterosexual' | 'homosexual' | 'bisexual' | 'other';
+}
+
+export class LimitedUserProfileDto {
+  _id: string;
+  name: string;
+  shortBio: string;
+  avatarUrl: string | null;
+  gender: string | undefined;
+  interests: string[];
+  popularityScore: number;
+  score: number;
 }
