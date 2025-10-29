@@ -1,7 +1,6 @@
 name: Build & Push Docker Image
 on:
   push:
-    branches: [ "master" ]
     tags:
       - 'v*.*.*'  # trigger on semantic version tags
 

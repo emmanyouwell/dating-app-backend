@@ -103,7 +103,7 @@ export class AuthController {
     res.cookie('token', result.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'none',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: parseInt(process.env.JWT_EXPIRES_IN_MS || '604800000'), // 7 days default
     });
 
