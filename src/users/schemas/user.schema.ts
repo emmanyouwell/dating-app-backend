@@ -83,7 +83,7 @@ export class User {
 
   @Prop({
     type: String,
-    enum: ['male', 'female', 'non-binary', 'other'],
+    enum: ['male', 'female', 'other'],
     default: 'other',
   })
   gender?: string;
