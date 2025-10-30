@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   NotFoundException,
   Param,
   Patch,
@@ -18,9 +19,11 @@ import { ApiResponse } from 'src/common/interfaces/api-response.interface';
 import { UserResponseDto } from 'src/common/dto/auth.dto';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { User } from './schemas/user.schema';
+import { ParseJsonFieldsInterceptor } from 'src/common/interceptors/ParseJsonStringInterceptor';
 
 @Controller('users')
 export class UsersController {
+  private readonly logger = new Logger(UsersController.name);
   constructor(private usersService: UsersService) {}
   /**
    * Update a user's profile, optionally with an avatar image
@@ -31,24 +34,29 @@ export class UsersController {
    */
   @UseGuards(JwtAuthGuard)
   @Patch('/me')
-  @UseInterceptors(FileInterceptor('avatar'))
+  @UseInterceptors(FileInterceptor('avatar'), ParseJsonFieldsInterceptor)
   async updateProfile(
     @CurrentUser() user: User,
     @UploadedFile() file: Express.Multer.File,
     @Body() updateUserProfileDto: UpdateUserDto,
   ): Promise<ApiResponse<UserResponseDto>> {
-    const updatedUser = await this.usersService.updateProfile(
-      user.id,
-      updateUserProfileDto,
-      file,
-    );
+    try {
+      const updatedUser = await this.usersService.updateProfile(
+        user.id,
+        updateUserProfileDto,
+        file,
+      );
 
-    return {
-      success: true,
-      message: 'Profile updated successfully',
-      data: updatedUser,
-      timestamp: new Date().toISOString(),
-    };
+      return {
+        success: true,
+        message: 'Profile updated successfully',
+        data: updatedUser,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error('Unexpected error in updateProfile', error);
+      throw error;
+    }
   }
 
   /**

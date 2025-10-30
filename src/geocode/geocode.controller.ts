@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { GeocodeService } from './geocode.service';
 import { AddressDto } from 'src/common/dto/user.dto';
 import { ApiResponse } from 'src/common/interfaces/api-response.interface';
@@ -15,11 +15,11 @@ export class GeocodeController {
    * @returns Promise<ApiResponse<GeocodeResponseDto[]>> | Array of geocodes and display name
    */
   @UseGuards(JwtAuthGuard)
-  @Post()
+  @Get()
   async searchAddress(
-    @Body() body: AddressDto,
+    @Query() query: AddressDto
   ): Promise<ApiResponse<GeocodeResponseDto[]>> {
-    const results = await this.geocodeServices.getCoordinates(body);
+    const results = await this.geocodeServices.getCoordinates(query);
     return {
       success: true,
       message: 'Coordinates fetched successfully',

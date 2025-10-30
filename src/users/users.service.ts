@@ -213,13 +213,15 @@ export class UsersService {
        * Uploads image to Cloudinary under `/dating-app/avatar` folder.
        * Returns both the `public_id` and `secure_url` for easy future deletion.
        */
-      const uploadResult = await this.cloudinaryService.uploadImage(file.path);
-      user.avatar = {
+      if (file && user.avatar?.public_id) {
+        await this.cloudinaryService.deleteImage(user.avatar.public_id);
+      }
+      const uploadResult = await this.cloudinaryService.uploadImage(file);
+      updateData.avatar = {
         public_id: uploadResult.public_id,
         url: uploadResult.secure_url,
       };
     }
-    this.logger.log(updateData.interests);
     const result = await this.userModel
       .findByIdAndUpdate(
         userId,

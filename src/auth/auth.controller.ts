@@ -105,6 +105,8 @@ export class AuthController {
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: parseInt(process.env.JWT_EXPIRES_IN_MS || '604800000'), // 7 days default
+      domain:'.emmandev.site',
+      path:'/'
     });
 
     const userResponse: UserResponseDto = {

@@ -19,13 +19,21 @@ export class CloudinaryService {
    * @returns The Cloudinary upload response
    * @throws HttpException if the upload fails
    */
-  async uploadImage(filePath: string): Promise<UploadApiResponse> {
-    const result = await cloudinary.uploader.upload(filePath, {
-      folder: 'dating-app/avatar', // customize your folder name
-      resource_type: 'image',
-    });
+  async uploadImage(file: Express.Multer.File): Promise<UploadApiResponse> {
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'avatars',
+          resource_type: 'image',
+        },
+        (error, result: UploadApiResponse) => {
+          if (error) return reject(error);
+          resolve(result);
+        },
+      );
 
-    return result;
+      uploadStream.end(file.buffer);
+    });
   }
 
   /**
