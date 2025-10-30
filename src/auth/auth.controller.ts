@@ -139,7 +139,13 @@ export class AuthController {
   ): Promise<ApiResponse> {
     await Promise.resolve();
     // Clear authentication cookie
-    res.clearCookie('token');
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      domain: process.env.DOMAIN_ORIGIN || undefined,
+      path: '/',
+    });
 
     return {
       success: true,
