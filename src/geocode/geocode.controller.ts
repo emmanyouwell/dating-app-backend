@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { GeocodeService } from './geocode.service';
 import { AddressDto } from 'src/common/dto/user.dto';
 import { ApiResponse } from 'src/common/interfaces/api-response.interface';
@@ -17,7 +17,7 @@ export class GeocodeController {
   @UseGuards(JwtAuthGuard)
   @Get()
   async searchAddress(
-    @Query() query: AddressDto
+    @Query() query: AddressDto,
   ): Promise<ApiResponse<GeocodeResponseDto[]>> {
     const results = await this.geocodeServices.getCoordinates(query);
     return {

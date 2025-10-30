@@ -27,7 +27,10 @@ export class CloudinaryService {
           resource_type: 'image',
         },
         (error, result: UploadApiResponse) => {
-          if (error) return reject(error);
+          if (error)
+            return reject(
+              new Error(error.message || 'Cloudinary upload failed'),
+            );
           resolve(result);
         },
       );

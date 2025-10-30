@@ -73,12 +73,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
   /** Expose a method for SwipeService to trigger chat unlock */
-  async notifyChatUnlocked(userA: string, userB: string) {
+  notifyChatUnlocked(userA: string, userB: string) {
     const room = this.chatService.getRoomName(userA, userB);
 
     // Join room for both users
-    await this.joinRoom(userA, userB);
-    await this.joinRoom(userB, userA);
+    this.joinRoom(userA, userB);
+    this.joinRoom(userB, userA);
 
     // Emit unlock event
     this.server.to(room).emit('chat-unlocked', { users: [userA, userB], room });

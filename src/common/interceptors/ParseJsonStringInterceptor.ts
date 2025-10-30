@@ -5,23 +5,37 @@ import {
   CallHandler,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
+import { Request } from 'express';
 
 @Injectable()
 export class ParseJsonFieldsInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const req = context.switchToHttp().getRequest();
-    const jsonFields = ['address', 'avatar', 'interests'];
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const req = context.switchToHttp().getRequest<Request>();
+    const rawBody = req.body as unknown;
+
+    // Safely narrow to a plain object
+    const body =
+      typeof rawBody === 'object' && rawBody !== null
+        ? (rawBody as Record<string, unknown>)
+        : ({} as Record<string, unknown>);
+
+    const jsonFields = ['address', 'avatar', 'interests'] as const;
 
     for (const key of jsonFields) {
-      const val = req.body[key];
+      const val = body[key];
+
       if (typeof val === 'string') {
         try {
-          req.body[key] = JSON.parse(val);
+          const parsed: unknown = JSON.parse(val); // 👈 safely type as unknown
+          body[key] = parsed;
         } catch {
-          // ignore parsing error
+          // ignore malformed JSON
         }
       }
     }
+
+    // reassign sanitized body
+    req.body = body;
 
     return next.handle();
   }

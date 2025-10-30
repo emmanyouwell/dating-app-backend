@@ -25,12 +25,34 @@ export class LocationDto {
   @ArrayMinSize(2)
   @ArrayMaxSize(2)
   @IsNumber({}, { each: true })
-  @Transform(({ value }) => {
-    if (!value) return undefined;
-    if (typeof value === 'string') return JSON.parse(value);
-    return value;
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === null || value === undefined) return undefined;
+
+    // If value is already an array of numbers
+    if (Array.isArray(value) && value.every((v) => typeof v === 'number')) {
+      return value;
+    }
+
+    // If it's a string, attempt to parse safely
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        if (
+          Array.isArray(parsed) &&
+          parsed.every((v) => typeof v === 'number')
+        ) {
+          return parsed;
+        }
+        return undefined; // parsed but not valid coordinates
+      } catch {
+        return undefined; // invalid JSON
+      }
+    }
+
+    // Otherwise, invalid type
+    return undefined;
   })
-  coordinates: number[];
+  coordinates!: number[];
 }
 
 /**
@@ -53,10 +75,24 @@ export class AddressDto {
   city?: string;
 
   @IsOptional()
-  @Transform(({ value }) => {
-    if (!value) return undefined;
-    if (typeof value === 'string') return JSON.parse(value);
-    return value;
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === null || value === undefined) return undefined;
+
+    // If it's already an object, just return it safely
+    if (typeof value === 'object') return value as LocationDto;
+
+    // If it's a string, try parsing it safely
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value) as LocationDto;
+        return parsed;
+      } catch {
+        return undefined; // avoid unsafe JSON.parse failures
+      }
+    }
+
+    // fallback — if it's neither string nor object
+    return undefined;
   })
   @Type(() => LocationDto)
   @ValidateNested()
@@ -85,7 +121,19 @@ export class UpdateUserDto {
 
   @IsOptional()
   @Type(() => Date)
-  @Transform(({ value }) => (value ? new Date(value) : undefined))
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      value instanceof Date
+    ) {
+      return new Date(value);
+    }
+
+    return undefined; // ignore invalid inputs
+  })
   @IsDate()
   birthday?: Date;
 
@@ -100,39 +148,82 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsArray()
-  @Transform(({ value }) => {
-    if (!value) return undefined;
-    let arr: string[];
-    if (typeof value === 'string') arr = JSON.parse(value);
-    else arr = value;
-    return arr.map((v: string) => new Types.ObjectId(v));
+  @Transform(({ value }: { value: unknown }): Types.ObjectId[] | undefined => {
+    if (value === null || value === undefined) return undefined;
+
+    let arr: unknown;
+
+    if (typeof value === 'string') {
+      try {
+        arr = JSON.parse(value) as unknown;
+      } catch {
+        return undefined;
+      }
+    } else {
+      arr = value;
+    }
+
+    if (!Array.isArray(arr)) return undefined;
+
+    const objectIds = arr
+      .map((v) => {
+        if (typeof v === 'string' && Types.ObjectId.isValid(v)) {
+          return new Types.ObjectId(v);
+        }
+        return null;
+      })
+      .filter((v): v is Types.ObjectId => v !== null);
+
+    return objectIds.length > 0 ? objectIds : undefined;
   })
   interests?: Types.ObjectId[];
 
+  // --- address ---
   @IsOptional()
-  @Transform(({ value }) => {
-    if (!value) return undefined;
+  @Transform(({ value }: { value: unknown }): AddressDto | undefined => {
+    if (value === null || value === undefined) return undefined;
+
     if (typeof value === 'string') {
       try {
-        return JSON.parse(value);
+        const parsed = JSON.parse(value) as AddressDto;
+        return parsed;
       } catch {
         return undefined;
       }
     }
-    return value;
+
+    if (typeof value === 'object' && value !== null) {
+      return value as AddressDto;
+    }
+
+    return undefined;
   })
   @ValidateNested()
   @Type(() => AddressDto)
   address?: AddressDto;
 
+  // --- avatar ---
   @IsOptional()
-  @Transform(({ value }) => {
-    if (!value) return undefined;
-    if (typeof value === 'string') return JSON.parse(value);
-    return value;
+  @Transform(({ value }: { value: unknown }): AvatarDto | undefined => {
+    if (value === null || value === undefined) return undefined;
+
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value) as AvatarDto;
+        return parsed;
+      } catch {
+        return undefined;
+      }
+    }
+
+    if (typeof value === 'object' && value !== null) {
+      return value as AvatarDto;
+    }
+
+    return undefined;
   })
-  @Type(() => AvatarDto)
   @ValidateNested()
+  @Type(() => AvatarDto)
   avatar?: AvatarDto;
 
   @IsOptional()

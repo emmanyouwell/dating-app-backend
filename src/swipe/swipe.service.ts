@@ -41,7 +41,7 @@ export class SwipeService {
       swipe.isMutualMatch = true;
       reciprocal.isMutualMatch = true;
       await reciprocal.save();
-      await this.chatGateway.notifyChatUnlocked(userId, candidateId);
+      this.chatGateway.notifyChatUnlocked(userId, candidateId);
     }
 
     return swipe.save();
