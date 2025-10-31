@@ -28,12 +28,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
     this.socketUserMap.set(client.id, userId);
-    // Join rooms for all mutual matches
-    const matches = await this.chatService.getMutualMatches(userId);
-    for (const matchId of matches) {
-      const room = await this.chatService.getRoomName(userId, matchId);
-      await client.join(room.roomName);
-    }
 
     this.logger.log(`User ${userId} connected`);
   }
@@ -48,12 +42,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!userId) return;
 
     const mutualMatches = await this.chatService.getMutualMatches(userId);
-
     const rooms = await Promise.all(
-      mutualMatches.map(async (matchId) => ({
-        userId: matchId,
-        room: await this.chatService.getRoomName(userId, matchId),
-      })),
+      mutualMatches.map(async (matchId) => {
+        const room = await this.chatService.getRoomName(userId, matchId);
+        await client.join(room.roomName); // join room only here
+        return { userId: matchId, room };
+      }),
     );
 
     // Send the rooms back only to this client
@@ -65,6 +59,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() payload: { toUserId: string; message: string },
   ) {
     this.logger.log('user sent a message');
+
     const fromUserId = String(this.socketUserMap.get(client.id));
     if (!fromUserId) return;
     const room = await this.chatService.getRoomName(
