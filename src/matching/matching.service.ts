@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Types } from 'mongoose';
 import { LimitedUserProfileDto } from 'src/common/dto/user.dto';
 import { getDistanceKm } from 'src/common/utils/address.utils';
 import { Interest } from 'src/interests/schema/interests.schema';
@@ -21,12 +22,22 @@ export class MatchingService {
    */
   async findMatches(
     currentUserId: string,
+    candidateIds?: Types.ObjectId[],
     limit = 20,
   ): Promise<LimitedUserProfileDto[]> {
     const currentUser = await this.usersService.findById(currentUserId);
     if (!currentUser) throw new NotFoundException('User not found');
+    let candidates: User[] = [];
+    if (candidateIds) {
+      candidates = await this.usersService.getSwipedCandidates(
+        candidateIds || [],
+      );
+    } else {
+      candidates = (await this.usersService.findCandidates(
+        currentUserId,
+      )) as User[];
+    }
 
-    const candidates = await this.usersService.findCandidates(currentUserId);
     let scoredCandidates: { candidate: User; totalScore: number }[] = [];
     if (candidates && candidates.length > 0) {
       scoredCandidates = await Promise.all(
@@ -66,6 +77,7 @@ export class MatchingService {
         interests: candidate?.interests?.map((i: Interest) => i.name) ?? [],
         popularityScore: candidate.popularityScore ?? 0,
         score: totalScore,
+        age: candidate.age ?? null,
       }));
   }
 
@@ -84,7 +96,7 @@ export class MatchingService {
       candidateInterests.includes(i),
     ).length;
     const totalUnique = new Set([...userInterests, ...candidateInterests]).size;
-    return common / totalUnique;
+    return common / totalUnique || 0;
   }
 
   /**
@@ -124,7 +136,7 @@ export class MatchingService {
     )
       ? 1
       : 0;
-    return ageScore * 0.4 + distanceScore * 0.4 + genderScore * 0.2;
+    return ageScore * 0.4 + distanceScore * 0.4 + genderScore * 0.2 || 0;
   }
 
   /**
@@ -136,7 +148,7 @@ export class MatchingService {
     const secondsDiff =
       (Date.now() - new Date(String(candidate?.lastActiveAt)).getTime()) / 1000;
     const weekSeconds = 604800;
-    return Math.max(0, 1 - secondsDiff / weekSeconds);
+    return Math.max(0, 1 - secondsDiff / weekSeconds) || 0;
   }
 
   /**

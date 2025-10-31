@@ -3,6 +3,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import cookieParser from 'cookie-parser';
+import { LastActiveInterceptor } from './common/interceptors/LastActive.interceptor';
 /**
  * Bootstrap the NestJS application with proper configuration
  */
@@ -29,7 +30,7 @@ async function bootstrap() {
         disableErrorMessages: process.env.NODE_ENV === 'production',
       }),
     );
-
+    app.useGlobalInterceptors(app.get(LastActiveInterceptor));
     // Global exception filter for consistent error handling
     app.useGlobalFilters(new HttpExceptionFilter());
 

@@ -51,10 +51,6 @@ export class UsersService {
 
       const user = new this.userModel(userData);
       const savedUser = await user.save();
-      await this.emailService.sendVerificationEmail(
-        user.email,
-        userData.verificationCode,
-      );
       this.logger.log(`User created successfully: ${userData.email}`);
       return savedUser;
     } catch (error) {
@@ -137,11 +133,15 @@ export class UsersService {
     try {
       const user = await this.userModel.findOne({ email }).lean().exec();
       if (user) {
+        await this.userModel.findByIdAndUpdate(user._id, {
+          lastLogin: new Date(),
+        });
         return {
           ...user,
           id: (user._id as Types.ObjectId).toHexString(),
         } as unknown as User;
       }
+
       this.logger.log(
         `User lookup by email: ${email} - ${user ? 'found' : 'not found'}`,
       );
@@ -163,6 +163,7 @@ export class UsersService {
       this.logger.log(
         `User lookup by ID: ${id} - ${user ? 'found' : 'not found'}`,
       );
+
       return user;
     } catch (error) {
       this.logger.error(`Error finding user by ID ${id}:`, error);
@@ -222,6 +223,7 @@ export class UsersService {
         url: uploadResult.secure_url,
       };
     }
+
     const result = await this.userModel
       .findByIdAndUpdate(
         userId,
@@ -278,6 +280,9 @@ export class UsersService {
             $maxDistance: preferences.maxDistance * 1000, // convert km to meters
           },
         },
+
+        'avatar.url': { $ne: null },
+        isEmailVerified: true,
       })
       .populate('interests')
       .limit(100);
@@ -286,5 +291,28 @@ export class UsersService {
       throw new NotFoundException('No other candidates');
     }
     return candidates;
+  }
+  async updateLastActive(userId: string): Promise<void> {
+    try {
+      this.logger.log('updating lastActiveAt');
+
+      await this.userModel.findByIdAndUpdate(userId, {
+        lastActiveAt: new Date(),
+      });
+    } catch (error) {
+      this.logger.error(error);
+    }
+  }
+  async getSwipedCandidates(candidateIds: Types.ObjectId[]): Promise<User[]> {
+    // Get array of ObjectIds
+    if (!candidateIds.length) return [];
+
+    // Fetch users matching these IDs
+    const users = await this.userModel
+      .find({ _id: { $in: candidateIds } })
+      .populate('interests')
+      .exec();
+
+    return users;
   }
 }

@@ -12,7 +12,6 @@ import {
   UserResponseDto,
 } from '../common/dto/auth.dto';
 import * as bcrypt from 'bcrypt';
-import { generateVerificationCode } from 'src/common/utils/generate-verification-code';
 import { User } from 'src/users/schemas/user.schema';
 import { PreferencesService } from 'src/preferences/preferences.service';
 
@@ -139,12 +138,10 @@ export class AuthService {
   async register(userData: RegisterDto): Promise<AuthResponseDto> {
     try {
       const hashedPassword = await bcrypt.hash(userData.password, 10);
-      const code = generateVerificationCode();
+
       const user = await this.usersService.create({
         ...userData,
         password: hashedPassword,
-        verificationCode: code,
-        verificationCodeExpiry: new Date(Date.now() + 10 * 60 * 1000),
       });
       await this.preferenceService.createDefault(user.id);
       this.logger.log(`User ${user.email} registered successfully`);

@@ -174,7 +174,7 @@ export class UpdateUserDto {
       })
       .filter((v): v is Types.ObjectId => v !== null);
 
-    return objectIds.length > 0 ? objectIds : undefined;
+    return objectIds;
   })
   interests?: Types.ObjectId[];
 
@@ -242,5 +242,6 @@ export class LimitedUserProfileDto {
   gender: string | undefined;
   interests: string[];
   popularityScore: number;
+  age: number | null;
   score: number;
 }

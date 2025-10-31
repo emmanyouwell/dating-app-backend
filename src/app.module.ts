@@ -15,6 +15,8 @@ import { HttpModule } from '@nestjs/axios';
 import { SwipeModule } from './swipe/swipe.module';
 import { ChatModule } from './chat/chat.module';
 import { MessageModule } from './message/message.module';
+import { UsersModule } from './users/users.module';
+import { LastActiveInterceptor } from './common/interceptors/LastActive.interceptor';
 
 @Module({
   imports: [
@@ -34,8 +36,14 @@ import { MessageModule } from './message/message.module';
     SwipeModule,
     ChatModule,
     MessageModule,
+    UsersModule,
   ],
   controllers: [AppController],
-  providers: [AppService, CloudinaryService, GeocodeService],
+  providers: [
+    AppService,
+    CloudinaryService,
+    GeocodeService,
+    LastActiveInterceptor,
+  ],
 })
 export class AppModule {}

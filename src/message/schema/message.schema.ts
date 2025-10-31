@@ -10,6 +10,7 @@ export class Message {
   @Prop({ required: true }) to: string;
   @Prop({ required: true }) message: string;
   @Prop({ default: Date.now }) createdAt: Date;
+  @Prop({ required: true }) room: string;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);
