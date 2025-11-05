@@ -17,9 +17,13 @@ import { ChatModule } from './chat/chat.module';
 import { MessageModule } from './message/message.module';
 import { UsersModule } from './users/users.module';
 import { LastActiveInterceptor } from './common/interceptors/LastActive.interceptor';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot({
+      throttlers: [{ ttl: 30, limit: 100 }],
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
     }),

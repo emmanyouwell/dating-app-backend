@@ -40,7 +40,7 @@ export class SwipeController {
    * @param candidateId string | Candidate user ID
    * @returns Promise<ApiResponse>
    */
-  @Post('left/')
+  @Post('left')
   async swipeLeft(
     @CurrentUser() user: User,
     @Body() body: { candidateId: string },
@@ -54,26 +54,6 @@ export class SwipeController {
     };
   }
 
-  /**
-   * Check if chat is unlocked for this user
-   * @param user User | Current user ID
-   * @param recipientId string | Recipient user ID
-   * @returns Promise<ApiResponse<Boolean>>
-   */
-  @Get('can-message/:recipientId')
-  async canMessage(
-    @CurrentUser() user: User,
-    @Param('recipientId') recipientId: string,
-  ): Promise<ApiResponse<boolean>> {
-    const userId = user.id;
-    const allowed = await this.swipeService.canMessage(userId, recipientId);
-    return {
-      success: true,
-      message: allowed ? 'Chat unlocked!' : 'Chat locked.',
-      data: allowed,
-      timestamp: new Date().toISOString(),
-    };
-  }
 
   @Get('/candidates')
   async fetchLikedCandidates(
