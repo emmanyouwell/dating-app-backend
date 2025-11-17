@@ -24,17 +24,48 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleConnection(client: Socket) {
     const userId = client.handshake.query.userId as string;
     if (!userId) {
+      this.logger.warn(`Connection rejected: No userId provided for socket ${client.id}`);
       client.disconnect();
       return;
     }
-    this.socketUserMap.set(client.id, userId);
+    
+    // Clean up any existing sockets for this user (prevent duplicate connections)
+    const existingSockets: string[] = [];
+    this.socketUserMap.forEach((mappedUserId, socketId) => {
+      if (mappedUserId === userId && socketId !== client.id) {
+        existingSockets.push(socketId);
+      }
+    });
+    
+    // Disconnect old sockets for the same user
+    existingSockets.forEach((socketId) => {
+      const oldSocket = this.server.sockets.sockets.get(socketId);
+      if (oldSocket) {
+        oldSocket.disconnect();
+        this.socketUserMap.delete(socketId);
+      }
+    });
 
-    this.logger.log(`User ${userId} connected`);
+    this.socketUserMap.set(client.id, userId);
+    this.logger.log(`User ${userId} connected with socket ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
+    const userId = this.socketUserMap.get(client.id);
+    
+    // Leave all rooms for this socket
+    const rooms = Array.from(client.rooms);
+    rooms.forEach((room) => {
+      if (room !== client.id) {
+        // client.id is the default room, skip it
+        client.leave(room);
+      }
+    });
+
     this.socketUserMap.delete(client.id);
-    this.logger.log(`Client disconnected: ${client.id}`);
+    this.logger.log(
+      `Client ${client.id} disconnected${userId ? ` (User: ${userId})` : ''}`,
+    );
   }
   @SubscribeMessage('fetch-rooms')
   async handleFetchRooms(@ConnectedSocket() client: Socket) {
